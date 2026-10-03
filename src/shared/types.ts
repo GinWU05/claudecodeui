@@ -5,7 +5,7 @@ import type { NavigateFunction } from 'react-router-dom';
 //----------------- LLM PROVIDER MODEL CATALOG ------------
 
 /** Identifies which coding-agent CLI backs a session, project selection or model list. */
-export type LLMProvider = 'claude' | 'cursor' | 'codex' | 'opencode';
+export type LLMProvider = 'claude' | 'cursor' | 'codex' | 'opencode' | 'pi';
 
 /** One selectable model in a provider's model menu, including its optional reasoning-effort choices. */
 export type ProviderModelOption = {
@@ -1315,6 +1315,12 @@ export type ProviderAuthStatus = {
   error: string | null;
   loading: boolean;
   subscriptionOverride?: ProviderAuthSubscriptionOverride;
+  /**
+   * Whether the provider's CLI answered on this machine, as reported by the
+   * backend status endpoint. Absent while the status is loading or the check
+   * failed, so consumers can tell "known to be missing" from "unknown".
+   */
+  installed?: boolean;
 };
 
 /** The authentication state of every CLI provider at once, keyed by LLMProvider, so onboarding and settings can render each provider's connected, loading and error state from one object returned by useProviderAuthStatus. */

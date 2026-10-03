@@ -38,6 +38,7 @@ type AgentRouterDependencies = {
   queryCursor: ProviderRunFunction;
   queryCodex: ProviderRunFunction;
   queryOpenCode: ProviderRunFunction;
+  queryPi: ProviderRunFunction;
   GithubClient: typeof import('@octokit/rest').Octokit;
 };
 
@@ -62,6 +63,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
   const spawnCursor = dependencies.queryCursor;
   const queryCodex = dependencies.queryCodex;
   const spawnOpenCode = dependencies.queryOpenCode;
+  const spawnPi = dependencies.queryPi;
   const Octokit = dependencies.GithubClient;
   const router = express.Router();
 
@@ -628,7 +630,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
    *                          - Source for auto-generated branch names (if createBranch=true and no branchName)
    *                          - Fallback for PR title if no commits are made
    *
-   * @param {string} provider - (Optional) AI provider to use. Options: 'claude' | 'cursor' | 'codex' | 'opencode'
+   * @param {string} provider - (Optional) AI provider to use. Options: 'claude' | 'cursor' | 'codex' | 'opencode' | 'pi'
    *                           Default: 'claude'
    *
    * @param {boolean} stream - (Optional) Enable Server-Sent Events (SSE) streaming for real-time updates.
@@ -756,7 +758,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
    * Input Validations (400 Bad Request):
    *   - Either githubUrl OR projectPath must be provided (not neither)
    *   - message must be non-empty string
-   *   - provider must be 'claude', 'cursor', 'codex', or 'opencode'
+   *   - provider must be 'claude', 'cursor', 'codex', 'opencode', or 'pi'
    *   - createBranch/createPR requires githubUrl OR projectPath (not neither)
    *   - branchName must pass Git naming rules (if provided)
    *
@@ -886,8 +888,8 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
       return res.status(400).json({ error: 'message is required' });
     }
 
-    if (requestedProvider !== null && !['claude', 'cursor', 'codex', 'opencode'].includes(requestedProvider)) {
-      return res.status(400).json({ error: 'provider must be "claude", "cursor", "codex", or "opencode"' });
+    if (requestedProvider !== null && !['claude', 'cursor', 'codex', 'opencode', 'pi'].includes(requestedProvider)) {
+      return res.status(400).json({ error: 'provider must be "claude", "cursor", "codex", "opencode", or "pi"' });
     }
 
     // Validate GitHub branch/PR creation requirements
@@ -1018,6 +1020,7 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
 
       const codexModels = await providerModelsService.getProviderModels('codex');
       const opencodeModels = await providerModelsService.getProviderModels('opencode');
+      const piModels = await providerModelsService.getProviderModels('pi');
 
       // Start the appropriate session
       if (provider === 'claude') {
@@ -1061,6 +1064,17 @@ export function createAgentRouter(dependencies: AgentRouterDependencies): expres
           cwd: finalProjectPath,
           sessionId: appSessionId,
           model: model || opencodeModels.DEFAULT,
+          effort,
+          permissionMode: 'bypassPermissions' // Agent runs are non-interactive, like the other providers above
+        }, run.writer);
+      } else if (provider === 'pi') {
+        console.log('Starting Pi CLI session');
+
+        await spawnPi(message.trim(), {
+          projectPath: finalProjectPath,
+          cwd: finalProjectPath,
+          sessionId: appSessionId,
+          model: model || piModels.DEFAULT,
           effort,
           permissionMode: 'bypassPermissions' // Agent runs are non-interactive, like the other providers above
         }, run.writer);

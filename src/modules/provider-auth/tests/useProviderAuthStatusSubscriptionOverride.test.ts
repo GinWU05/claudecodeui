@@ -38,6 +38,7 @@ describe('useProviderAuthStatus subscription override', () => {
     });
 
     expect(result.current.providerAuthStatus.claude).toEqual({
+      installed: true,
       authenticated: true,
       email: 'API Key Auth',
       method: 'api_key',
@@ -62,6 +63,7 @@ describe('useProviderAuthStatus subscription override', () => {
     });
 
     expect(result.current.providerAuthStatus.claude).toEqual({
+      installed: true,
       authenticated: true,
       email: 'someone@example.com',
       method: 'credentials_file',
