@@ -8,6 +8,7 @@ import {
   appendImagesInputTag,
   normalizeAttachmentDescriptors,
 } from '@/shared/image-attachments.js';
+import { piProviderModels, reconcilePiRunModel } from '@/modules/providers/list/pi/pi-models.provider.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import type { NormalizedMessage, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/types.js';
 import { AppError, createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell } from '@/shared/utils.js';
@@ -332,7 +333,18 @@ async function spawnPi(
       normalizeMessage: (raw: unknown, normalizedSessionId: string | null) => context.normalizeMessage(raw, normalizedSessionId),
     };
 
-    void context.resolveResumeModel(sessionId ?? undefined, model).then(async (resolvedModel) => {
+    void context.resolveResumeModel(sessionId ?? undefined, model).then(async (recordedModel) => {
+      // A recorded/selected model pi cannot route to (e.g. a stale
+      // `anthropic/...` pick from the old curated list) falls back to pi's
+      // own default — judged only against pi's live list, never the fallback.
+      let resolvedModel = recordedModel;
+      try {
+        const definition = await context.getProviderModels();
+        resolvedModel = reconcilePiRunModel(recordedModel, { definition, live: piProviderModels.isLive() });
+      } catch {
+        resolvedModel = recordedModel;
+      }
+
       // Aborted while the model was still resolving: the gateway already sent
       // this run's terminal complete on the abort path, so spawn nothing and
       // stay silent.

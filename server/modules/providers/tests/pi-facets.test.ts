@@ -9,6 +9,10 @@ import { PiMcpProvider } from '@/modules/providers/list/pi/pi-mcp.provider.js';
 import {
   PI_PREDEFINED_MODELS,
   PiProviderModels,
+  parsePiListModelsOutput,
+  pickPiDefaultModel,
+  reconcilePiRunModel,
+  resolvePiAgentDir,
 } from '@/modules/providers/list/pi/pi-models.provider.js';
 import { PiSkillsProvider } from '@/modules/providers/list/pi/pi-skills.provider.js';
 import { createProviderTokenUsageService } from '@/modules/providers/services/provider-token-usage.service.js';
@@ -214,41 +218,113 @@ test('auth does not treat an empty auth store as usable credentials', async () =
 // models
 // ---------------------------------------------------------------------------
 
-test('the pi catalog keeps the frontend default and declares effort for every model', () => {
-  assert.equal(PI_PREDEFINED_MODELS.DEFAULT, 'anthropic/claude-sonnet-4');
+const LIST_MODELS_OUTPUT = [
+  'provider  model             context  max-out  thinking  images',
+  'linewise  claude-fable-5    200K     128K     yes       yes   ',
+  'linewise  claude-haiku-4-5  200K     64K      yes       yes   ',
+  'linewise  claude-opus-5-5   200K     128K     yes       yes   ',
+  '',
+].join('\n');
 
+const liveModels = (overrides: Partial<ConstructorParameters<typeof PiProviderModels>[0]> = {}) => new PiProviderModels({
+  listModels: async () => LIST_MODELS_OUTPUT,
+  readSettings: async () => ({ defaultProvider: 'linewise', defaultModel: 'claude-opus-5-5' }),
+  ...overrides,
+});
+
+test('the curated fallback catalog declares a label and effort list for every model', () => {
   const values = PI_PREDEFINED_MODELS.OPTIONS.map((option) => option.value);
-  assert.ok(values.length > 0);
   assert.ok(values.includes(PI_PREDEFINED_MODELS.DEFAULT));
-
   for (const option of PI_PREDEFINED_MODELS.OPTIONS) {
     assert.ok(option.label.trim().length > 0, `${option.value} needs a label`);
-    assert.ok(
-      Array.isArray(option.effort?.values),
-      `${option.value} must declare an effort list (empty until pi exposes one)`,
-    );
-  }
-
-  for (const providerPrefix of ['anthropic/', 'zai-coding-cn/', 'openai/']) {
-    assert.ok(
-      values.some((value) => value.startsWith(providerPrefix)),
-      `catalog is missing a ${providerPrefix}* model`,
-    );
+    assert.ok(Array.isArray(option.effort?.values));
   }
 });
 
-test('the pi models facet serves the curated catalog and its default', async () => {
-  const models = new PiProviderModels();
+test('parsePiListModelsOutput turns the pi table into provider/model options', () => {
+  assert.deepEqual(parsePiListModelsOutput(LIST_MODELS_OUTPUT), [
+    { value: 'linewise/claude-fable-5', label: 'claude-fable-5', description: 'linewise', effort: { values: [] } },
+    { value: 'linewise/claude-haiku-4-5', label: 'claude-haiku-4-5', description: 'linewise', effort: { values: [] } },
+    { value: 'linewise/claude-opus-5-5', label: 'claude-opus-5-5', description: 'linewise', effort: { values: [] } },
+  ]);
+  assert.deepEqual(parsePiListModelsOutput(''), []);
+  assert.deepEqual(parsePiListModelsOutput('provider  model  context\n'), []);
+});
 
-  assert.deepEqual(await models.getSupportedModels(), PI_PREDEFINED_MODELS);
-  assert.deepEqual(await models.getCurrentActiveModel(), {
-    model: PI_PREDEFINED_MODELS.DEFAULT,
+test('pickPiDefaultModel follows pi settings and ignores models pi does not list', () => {
+  const options = parsePiListModelsOutput(LIST_MODELS_OUTPUT);
+  assert.equal(pickPiDefaultModel(options, { defaultProvider: 'linewise', defaultModel: 'claude-haiku-4-5' }), 'linewise/claude-haiku-4-5');
+  assert.equal(pickPiDefaultModel(options, { defaultModel: 'claude-fable-5' }), 'linewise/claude-fable-5');
+  assert.equal(pickPiDefaultModel(options, { defaultModel: 'linewise/claude-fable-5' }), 'linewise/claude-fable-5');
+  assert.equal(pickPiDefaultModel(options, { defaultProvider: 'anthropic', defaultModel: 'claude-sonnet-4' }), null);
+  assert.equal(pickPiDefaultModel(options, null), null);
+});
+
+test('resolvePiAgentDir honors PI_CODING_AGENT_DIR like pi does', () => {
+  assert.equal(resolvePiAgentDir({}), path.join(os.homedir(), '.pi', 'agent'));
+  assert.equal(resolvePiAgentDir({ PI_CODING_AGENT_DIR: '/tmp/pi-agent' }), '/tmp/pi-agent');
+  assert.equal(resolvePiAgentDir({ PI_CODING_AGENT_DIR: '~/custom' }), path.join(os.homedir(), 'custom'));
+});
+
+test('the pi models facet serves the live list with pi\'s own default', async () => {
+  const models = liveModels();
+  const definition = await models.getSupportedModels();
+  assert.equal(definition.DEFAULT, 'linewise/claude-opus-5-5');
+  assert.equal(definition.OPTIONS.length, 3);
+  assert.equal(models.isLive(), true);
+  assert.deepEqual(await models.getCurrentActiveModel('session-1'), { model: 'linewise/claude-opus-5-5' });
+});
+
+test('the pi models facet defaults to the first listed model when settings name none', async () => {
+  const definition = await liveModels({ readSettings: async () => null }).getSupportedModels();
+  assert.equal(definition.DEFAULT, 'linewise/claude-fable-5');
+});
+
+test('the pi models facet falls back to the curated catalog when pi fails', async () => {
+  const failing = liveModels({ listModels: async () => { throw new Error('spawn pi ENOENT'); } });
+  assert.deepEqual(await failing.getSupportedModels(), PI_PREDEFINED_MODELS);
+  assert.equal(failing.isLive(), false);
+  const empty = liveModels({ listModels: async () => '' });
+  assert.deepEqual(await empty.getSupportedModels(), PI_PREDEFINED_MODELS);
+});
+
+test('the pi models facet caches the list for the TTL and dedupes concurrent loads', async () => {
+  let calls = 0;
+  let now = 1_000;
+  const models = liveModels({
+    listModels: async () => { calls += 1; return LIST_MODELS_OUTPUT; },
+    now: () => now,
+    ttlMs: 60_000,
   });
-  // Phase 1 has no runtime model state to read back, so a session id resolves
-  // to the same curated default.
-  assert.deepEqual(await models.getCurrentActiveModel('session-1'), {
-    model: PI_PREDEFINED_MODELS.DEFAULT,
-  });
+  await Promise.all([models.getSupportedModels(), models.getSupportedModels()]);
+  assert.equal(calls, 1);
+  now += 59_000;
+  await models.getSupportedModels();
+  assert.equal(calls, 1);
+  now += 2_000;
+  await models.getSupportedModels();
+  assert.equal(calls, 2);
+});
+
+test('reconcilePiRunModel swaps models pi cannot route to for pi\'s default, only on a live list', () => {
+  const definition = {
+    OPTIONS: [
+      ...parsePiListModelsOutput(LIST_MODELS_OUTPUT),
+      { value: 'custom/my-model', label: 'Mine', isCustom: true },
+    ],
+    DEFAULT: 'linewise/claude-opus-5-5',
+  };
+  const live = { definition, live: true };
+  assert.equal(reconcilePiRunModel('linewise/claude-haiku-4-5', live), 'linewise/claude-haiku-4-5');
+  assert.equal(reconcilePiRunModel('linewise/claude-haiku-4-5:high', live), 'linewise/claude-haiku-4-5:high');
+  assert.equal(reconcilePiRunModel('claude-haiku-4-5', live), 'claude-haiku-4-5');
+  assert.equal(reconcilePiRunModel('custom/my-model', live), 'custom/my-model');
+  assert.equal(reconcilePiRunModel('anthropic/claude-sonnet-4', live), 'linewise/claude-opus-5-5');
+  assert.equal(reconcilePiRunModel(undefined, live), 'linewise/claude-opus-5-5');
+  // Against the curated fallback nothing is known about what pi can route to.
+  const fallback = { definition: PI_PREDEFINED_MODELS, live: false };
+  assert.equal(reconcilePiRunModel('linewise/claude-haiku-4-5', fallback), 'linewise/claude-haiku-4-5');
+  assert.equal(reconcilePiRunModel(undefined, fallback), undefined);
 });
 
 // ---------------------------------------------------------------------------

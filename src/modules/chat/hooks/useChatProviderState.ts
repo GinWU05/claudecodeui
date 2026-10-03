@@ -33,7 +33,9 @@ const FALLBACK_DEFAULT_MODEL: Record<LLMProvider, string> = {
   cursor: 'gpt-5.3-codex',
   codex: 'gpt-5.4',
   opencode: 'anthropic/claude-sonnet-4-5',
-  pi: 'anthropic/claude-sonnet-4',
+  // Empty until the backend's live `pi --list-models` catalog arrives: pi then
+  // runs with its own configured default instead of a guessed provider.
+  pi: '',
 };
 
 const PROVIDERS: LLMProvider[] = ['claude', 'cursor', 'codex', 'opencode', 'pi'];
@@ -500,7 +502,18 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     && sessionSelection.provider === selectedSessionProvider
     ? sessionSelection
     : null;
-  const sessionModel = activeSessionSelection?.model ?? null;
+  const recordedSessionModel = activeSessionSelection?.model ?? null;
+  // pi's catalog is pi's live model list: a session recorded with a model pi
+  // can no longer route to (e.g. an old curated `anthropic/...` default) shows
+  // and sends the current pick instead; the backend applies the same rule.
+  const piCatalog = providerModelCatalog.pi;
+  const sessionModel = recordedSessionModel
+    && selectedSessionProvider === 'pi'
+    && piCatalog
+    && piCatalog.OPTIONS.length > 0
+    && !piCatalog.OPTIONS.some((option) => option.value === recordedSessionModel)
+    ? null
+    : recordedSessionModel;
 
   useEffect(() => {
     const requestId = sessionSelectionLoadRequestIdRef.current + 1;
