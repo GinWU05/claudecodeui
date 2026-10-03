@@ -11,7 +11,7 @@ import {
 import { piProviderModels, reconcilePiRunModel } from '@/modules/providers/list/pi/pi-models.provider.js';
 import { notifyRunFailed, notifyRunStopped } from '@/modules/notifications/index.js';
 import type { NormalizedMessage, ProviderRuntimeContext, ProviderRuntimeWriter } from '@/shared/types.js';
-import { AppError, createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell } from '@/shared/utils.js';
+import { AppError, createCompleteMessage, createNormalizedMessage, flattenPromptForWindowsShell, stripAnsiSequences } from '@/shared/utils.js';
 
 // cross-spawn resolves .cmd shims/PATHEXT on Windows and delegates to
 // child_process.spawn everywhere else.
@@ -393,7 +393,9 @@ async function spawnPi(
       });
 
       piProcess.stderr?.on('data', (data: Buffer) => {
-        const stderrText = stderrDecoder.write(data);
+        // pi writes terminal control sequences (e.g. `ESC[?1004l`) to stderr
+        // even in print mode; styling-only chunks are not errors.
+        const stderrText = stripAnsiSequences(stderrDecoder.write(data));
         if (!stderrText.trim()) {
           return;
         }

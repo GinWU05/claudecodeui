@@ -122,6 +122,14 @@ if (mode === 'hang') {
   console.log(header);
   // Long-running turn: no further output, process stays alive until killed.
   setTimeout(() => {}, 30_000);
+} else if (mode === 'stderr-escapes') {
+  // pi writes terminal control sequences to stderr even in print mode.
+  process.stderr.write('\\u001b[?1004l');
+  setTimeout(() => {
+    process.stderr.write('\\u001b[31mreal failure\\u001b[0m\\n');
+    const events = ${JSON.stringify(FAKE_EVENTS)}.map((event) => JSON.stringify(event));
+    console.log([header].concat(events.slice(1)).join('\\n'));
+  }, 20);
 } else if (mode === 'garbage') {
   console.log('pi: warning: partially written line');
 } else if (mode === 'utf8-split') {
@@ -405,6 +413,20 @@ test('spawnPi keeps stdout non-JSON lines streaming and still completes once', a
     assert.deepEqual(
       messages.filter((message) => message.kind === 'stream_delta').map((message) => message.content),
       ['pi: warning: partially written line'],
+    );
+    assert.equal(messages.filter((message) => message.kind === 'complete').length, 1);
+  });
+});
+
+test('spawnPi drops styling-only stderr and strips escapes from real stderr', async () => {
+  const messages: NormalizedMessage[] = [];
+  await withFakePiOnPath('stderr-escapes', async (tempRoot) => {
+    const writer = createWriter(messages);
+    await piRuntime.run('Say hi', { sessionId: 'app-1', cwd: tempRoot }, writer, makeRuntimeContext());
+
+    assert.deepEqual(
+      messages.filter((message) => message.kind === 'error').map((message) => message.content),
+      ['real failure\n'],
     );
     assert.equal(messages.filter((message) => message.kind === 'complete').length, 1);
   });
