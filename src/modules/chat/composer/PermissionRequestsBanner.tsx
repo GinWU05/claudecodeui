@@ -63,7 +63,7 @@ export default function PermissionRequestsBanner({
         const permissionEntry = buildClaudeToolPermissionEntry(request.toolName, rawInput);
         const settings = getClaudeSettings();
         const alreadyAllowed = permissionEntry ? settings.allowedTools.includes(permissionEntry) : false;
-        const rememberLabel = alreadyAllowed ? 'Allow (saved)' : 'Allow & remember';
+        const rememberLabel = alreadyAllowed ? t('chat:permissionBanner.allowSaved') : t('chat:permissionBanner.allowAndRemember');
         const matchingRequestIds = permissionEntry
           ? pendingPermissionRequests
               .filter(
@@ -108,7 +108,7 @@ export default function PermissionRequestsBanner({
                 variant="outline"
                 onClick={() => handlePermissionDecision(request.requestId, { allow: false, message: t('chat:misc.userDeniedTool') })}
               >
-                Deny
+                {t('chat:permissionBanner.deny')}
               </ConfirmationAction>
               <ConfirmationAction
                 variant="outline"
@@ -119,6 +119,7 @@ export default function PermissionRequestsBanner({
                   handlePermissionDecision(matchingRequestIds, { allow: true, rememberEntry: permissionEntry });
                 }}
                 disabled={!permissionEntry}
+                title={t('chat:permissionBanner.allowAndRememberTooltip')}
               >
                 {rememberLabel}
               </ConfirmationAction>
@@ -126,7 +127,7 @@ export default function PermissionRequestsBanner({
                 variant="default"
                 onClick={() => handlePermissionDecision(request.requestId, { allow: true })}
               >
-                Allow once
+                {t('chat:permissionBanner.allowOnce')}
               </ConfirmationAction>
             </ConfirmationActions>
           </Confirmation>

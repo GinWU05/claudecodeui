@@ -466,6 +466,57 @@
     },
     "actions": {
       "add": "添加"
+    },
+    "claude": {
+      "intro": {
+        "title": "CloudCLI 的权限独立于终端 claude",
+        "mode": "权限模式（默认 / Auto / 接受编辑 / 跳过）只在这里和聊天框里设置，不读也不写 ~/.claude/settings.json 的 defaultMode。",
+        "rules": "工具规则以终端 claude 为准：~/.claude/settings.json 里的 permissions.allow / deny 在这里同样生效，平时去那边改。",
+        "cloudcliLists": "下方「允许的工具」「禁用的工具」只对 CloudCLI 生效，叠加在 settings.json 的规则之上。手动添加请留空；聊天里点「允许并记住」时会自动写进来。"
+      },
+      "defaultMode": {
+        "title": "默认权限模式",
+        "description": "新会话一律从这个模式开始。在聊天框里临时切换的模式只影响当前会话，不会沿用到下一个新会话。",
+        "modes": {
+          "default": {
+            "title": "默认（推荐）",
+            "description": "每个没有预先允许的工具都会弹出审批，由你决定。"
+          },
+          "auto": {
+            "title": "Auto",
+            "description": "由分类器自动放行安全操作、拦下危险操作，打扰最少。"
+          },
+          "acceptEdits": {
+            "title": "接受编辑",
+            "description": "文件编辑自动通过，命令执行等其它操作仍需审批。"
+          },
+          "plan": {
+            "title": "计划",
+            "description": "只读规划，不执行任何修改。"
+          }
+        },
+        "priority": {
+          "title": "权限模式优先级（从高到低）：",
+          "skip": "「跳过权限提示」启动状态时",
+          "session": "本会话在聊天框选的模式",
+          "beforeSend": "新会话发送第一条消息前在聊天框选的模式",
+          "configured": "本页的「默认权限模式」",
+          "never": "不读 ~/.claude/settings.json 的 defaultMode。"
+        }
+      },
+      "skipPermissions": {
+        "label": "跳过权限提示（危险）",
+        "description": "等同于 --dangerously-skip-permissions。开着时，不管聊天框和上面选的是什么模式，所有工具都直接执行、不再问你；只有「计划」模式例外，仍然只读。请保持关闭。",
+        "tooltip": "保持关闭。原则：信任终端 claude，不信任 CloudCLI。确实需要放开时，在当前会话的聊天框里临时切换模式，不要在这里全局打开。"
+      },
+      "allowedTools": {
+        "description": "仅对 CloudCLI 生效，存在 CloudCLI 自己的数据库里，终端 claude 看不到。请不要在这里手动添加；长期规则写进 ~/.claude/settings.json 的 permissions.allow。聊天审批时点「允许并记住」，规则会出现在这里，不需要的可以删掉。",
+        "empty": "没有 CloudCLI 专属的允许规则（settings.json 里的 allow 规则照样生效）"
+      },
+      "blockedTools": {
+        "description": "仅对 CloudCLI 生效，终端 claude 看不到。建议留空，统一用 ~/.claude/settings.json 的 permissions.deny，那里的规则在 CloudCLI 里同样生效。",
+        "empty": "没有 CloudCLI 专属的禁用规则（settings.json 里的 deny 规则照样生效）"
+      }
     }
   },
   "mcpServers": {

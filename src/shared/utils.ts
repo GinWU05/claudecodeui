@@ -1,7 +1,8 @@
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-import type { Project, ProjectSession, QuickSettingsTab, SlashCommand } from '@/shared/types';
+import { CLAUDE_DEFAULT_PERMISSION_MODES } from '@/shared/constants';
+import type { ClaudeDefaultPermissionMode, Project, ProjectSession, QuickSettingsTab, SlashCommand } from '@/shared/types';
 
 //----------------- DEPLOYMENT MODE ------------
 
@@ -250,3 +251,19 @@ export const getQuickSettingsTabId = (tab: QuickSettingsTab): string => `quick-s
 
 /** DOM id of the tabpanel a quick settings tab controls; pairs with `getQuickSettingsTabId`. */
 export const getQuickSettingsTabPanelId = (tab: QuickSettingsTab): string => `quick-settings-tabpanel-${tab}`;
+
+// ---------------------------
+
+//----------------- CLAUDE PERMISSION SETTINGS ------------
+
+/**
+ * Narrows the stored `claudePermissions.defaultPermissionMode` to a supported
+ * starting mode, falling back to 'default' for missing, legacy or unknown
+ * values (including 'bypassPermissions'). Used by the settings controller and
+ * the chat storage reader so both agree on what a bad value means.
+ */
+export const toClaudeDefaultPermissionMode = (value: unknown): ClaudeDefaultPermissionMode => (
+  CLAUDE_DEFAULT_PERMISSION_MODES.includes(value as ClaudeDefaultPermissionMode)
+    ? (value as ClaudeDefaultPermissionMode)
+    : 'default'
+);

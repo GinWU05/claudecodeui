@@ -274,6 +274,9 @@ export type QueueItemStatus = 'completed' | 'in_progress' | 'pending';
 /** Permission preset a provider runs a turn under ('default', 'acceptEdits', 'auto', 'bypassPermissions' or 'plan'), chosen in the composer and sent with each message; the backend capability matrix decides which values a given provider accepts. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'auto' | 'bypassPermissions' | 'plan';
 
+/** Permission mode every new Claude chat starts in, chosen on the Claude permissions settings page and stored with `claudePermissions` in auth.db, independent of `permissions.defaultMode` in ~/.claude/settings.json; bypass is deliberately excluded so it can only be picked per session in the composer. */
+export type ClaudeDefaultPermissionMode = Exclude<PermissionMode, 'bypassPermissions'>;
+
 /** A non-image file attached to a chat message, described by its path in the server-managed attachment store plus display metadata so it can be listed and downloaded. */
 export type ChatAttachment = {
   /** Absolute path inside the server-managed chat attachment store. */
@@ -403,11 +406,12 @@ export type ChatMessage = {
   [key: string]: unknown;
 };
 
-/** The user's locally persisted Claude preferences (allowed and disallowed tool lists, permission skipping and project sort order) read from and written back to browser storage. */
+/** The user's locally persisted Claude preferences (allowed and disallowed tool lists, permission skipping, default permission mode and project sort order) read from and written back to browser storage. */
 export type ClaudeSettings = {
   allowedTools: string[];
   disallowedTools: string[];
   skipPermissions: boolean;
+  defaultPermissionMode: ClaudeDefaultPermissionMode;
   projectSortOrder: string;
   lastUpdated?: string;
   [key: string]: unknown;
@@ -1379,11 +1383,12 @@ export type AgentSettingsProject = {
   path?: string;
 };
 
-/** Claude's persisted permission settings: the allowed and disallowed tool patterns and whether permission prompts are skipped; read and written as one unit by the settings controller. */
+/** Claude's persisted permission settings: the allowed and disallowed tool patterns whether permission prompts are skipped and the mode new chats start in; read and written as one unit by the settings controller. */
 export type ClaudePermissionsState = {
   allowedTools: string[];
   disallowedTools: string[];
   skipPermissions: boolean;
+  defaultPermissionMode: ClaudeDefaultPermissionMode;
 };
 
 /** The user's notification settings, grouped into delivery channels (in-app, web push, desktop, sound) and the events that trigger them; mirrors the payload of the notification preferences API. */

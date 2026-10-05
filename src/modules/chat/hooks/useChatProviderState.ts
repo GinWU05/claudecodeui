@@ -10,6 +10,7 @@ import type { PendingPermissionRequest, PermissionMode,
   ProviderModelOption,
   ProviderModelsDefinition } from '@/shared/types';
 import { DEFAULT_EFFORT_VALUE } from '@/shared/constants';
+import { getClaudeSettings } from '@/modules/chat/utils/chatStorage';
 import { readSelectedProvider, writeSelectedProvider } from '@/shared/selectedProvider';
 
 const FALLBACK_PROVIDER_EFFORT_VALUES: Partial<Record<LLMProvider, readonly string[]>> = {
@@ -410,20 +411,61 @@ export function useChatProviderState({ selectedSession, selectedProject: _select
     }
   }, [providerEfforts, providerModels, reconcileStoredEffort]);
 
+  // What the permission-mode effect last resolved for: the session id, or
+  // `new:<provider>` for an unsent chat; `null` until its first run. Lets the
+  // effect tell "just opened a new chat" and "the new chat just got its id"
+  // apart from re-runs caused by capabilities loading.
+  const permissionModeTargetRef = useRef<string | null>(null);
+
   useEffect(() => {
     const validModes = getPermissionModesForProvider(provider);
-    const sessionSavedMode = selectedSession?.id
-      ? (localStorage.getItem(`permissionMode-${selectedSession.id}`) as PermissionMode | null)
+    const sessionId = selectedSession?.id;
+    const newChatTarget = `new:${provider}`;
+    const previousTarget = permissionModeTargetRef.current;
+    const openedNewChat = !sessionId && previousTarget !== newChatTarget;
+    const newChatGotId = Boolean(sessionId) && previousTarget === newChatTarget;
+    permissionModeTargetRef.current = sessionId ?? newChatTarget;
+    const lastModeKey = `permissionMode-last-${provider}`;
+
+    // Claude new chats start in the mode chosen on the settings page (local
+    // patch), not in whatever was picked last time, so a one-off bypass never
+    // carries over. Re-seeding the "last" key keeps the existing hand-off
+    // below working: a mode picked before the first send is written there and
+    // read back once the real session id appears.
+    const configuredDefaultMode = provider === 'claude'
+      ? getClaudeSettings().defaultPermissionMode
+      : null;
+    const hasConfiguredDefault = Boolean(configuredDefaultMode && validModes.includes(configuredDefaultMode));
+    if (openedNewChat && hasConfiguredDefault && configuredDefaultMode) {
+      localStorage.setItem(lastModeKey, configuredDefaultMode);
+      setPermissionMode(configuredDefaultMode);
+      return;
+    }
+
+    const sessionSavedMode = sessionId
+      ? (localStorage.getItem(`permissionMode-${sessionId}`) as PermissionMode | null)
       : null;
     // Fall back to the last mode picked for this provider: a brand-new chat
     // only receives its session id after the first send, so without this the
     // mode chosen beforehand would snap back to the default as soon as the
-    // session id appears.
-    const providerSavedMode = localStorage.getItem(`permissionMode-last-${provider}`) as PermissionMode | null;
+    // session id appears. With a configured default, only that hand-off reads
+    // the "last" key; any other session without a saved mode starts from the
+    // configured default instead of inheriting another session's choice.
+    const providerSavedMode = !hasConfiguredDefault || newChatGotId || !sessionId
+      ? (localStorage.getItem(lastModeKey) as PermissionMode | null)
+      : null;
     const savedMode = [sessionSavedMode, providerSavedMode].find(
       (mode): mode is PermissionMode => Boolean(mode && validModes.includes(mode)),
     );
-    setPermissionMode(savedMode ?? getDefaultPermissionModeForProvider(provider));
+    const resolvedMode = savedMode
+      ?? (hasConfiguredDefault ? configuredDefaultMode : null)
+      ?? getDefaultPermissionModeForProvider(provider);
+    // Pin the mode to the session once it has an id, so re-seeding the "last"
+    // key on the next new chat cannot change what this session runs under.
+    if (hasConfiguredDefault && sessionId && !sessionSavedMode) {
+      localStorage.setItem(`permissionMode-${sessionId}`, resolvedMode);
+    }
+    setPermissionMode(resolvedMode);
   }, [selectedSession?.id, provider, getDefaultPermissionModeForProvider, getPermissionModesForProvider]);
 
   useEffect(() => {

@@ -1,5 +1,6 @@
 import type { ClaudeSettings } from '@/shared/types';
 import { readUserPreference, writeUserPreference } from '@/shared/userSettings';
+import { toClaudeDefaultPermissionMode } from '@/shared/utils';
 
 export const safeLocalStorage = {
   setItem: (key: string, value: string) => {
@@ -56,6 +57,7 @@ export function getClaudeSettings(): ClaudeSettings {
     allowedTools: Array.isArray(stored.allowedTools) ? stored.allowedTools : [],
     disallowedTools: Array.isArray(stored.disallowedTools) ? stored.disallowedTools : [],
     skipPermissions: Boolean(stored.skipPermissions),
+    defaultPermissionMode: toClaudeDefaultPermissionMode(stored.defaultPermissionMode),
     projectSortOrder: readUserPreference<ClaudeSettings['projectSortOrder']>('projectSortOrder', 'name'),
   };
 }
@@ -66,5 +68,8 @@ export function saveClaudePermissions(permissions: {
   disallowedTools: string[];
   skipPermissions: boolean;
 }): void {
-  writeUserPreference('claudePermissions', permissions);
+  // Merge over the stored blob so fields owned by the settings page (such as
+  // `defaultPermissionMode`) survive a grant made from the chat.
+  const stored = readUserPreference<Record<string, unknown>>('claudePermissions', {});
+  writeUserPreference('claudePermissions', { ...stored, ...permissions });
 }

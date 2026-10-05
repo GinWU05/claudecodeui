@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
-import type { FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
+import type { ClaudeDefaultPermissionMode, FileStatusCode, LLMProvider, McpProvider, McpScope, McpTransport, SettingsMainTab } from '@/shared/types';
 import type { UserPreferenceKey } from '@/shared/userSettings';
 
 /** The four buckets the git changes view sorts working-tree files into. */
@@ -225,3 +225,14 @@ export const PROVIDER_PERMISSION_PREFERENCE_KEYS: Record<LLMProvider, UserPrefer
   opencode: 'opencodePermissions',
   pi: 'piPermissions',
 };
+
+// ---------------------------
+
+//----------------- CLAUDE PERMISSION SETTINGS ------------
+
+/**
+ * Modes offered as the starting mode for new Claude chats, in display order
+ * (local patch). Bypass is left out on purpose: skipping every prompt should
+ * only ever be a per-session choice made in the composer.
+ */
+export const CLAUDE_DEFAULT_PERMISSION_MODES: readonly ClaudeDefaultPermissionMode[] = ['default', 'auto', 'acceptEdits', 'plan'];

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { AlertTriangle, Plus, Shield, X } from 'lucide-react';
+import { AlertTriangle, Info, Plus, Shield, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
-import { Button, Input } from '@/shared/ui';
-import type { CodexPermissionMode } from '@/shared/types';
+import { Button, Input, Tooltip } from '@/shared/ui';
+import { CLAUDE_DEFAULT_PERMISSION_MODES } from '@/shared/constants';
+import type { ClaudeDefaultPermissionMode, CodexPermissionMode } from '@/shared/types';
 
 const COMMON_CLAUDE_TOOLS = [
   'Bash(git log:*)',
@@ -37,6 +38,9 @@ const COMMON_CURSOR_COMMANDS = [
   'Shell(node)',
 ];
 
+// i18n keys of the "which mode wins" list on the Claude page, highest priority first (local patch).
+const CLAUDE_MODE_PRIORITY_STEPS = ['skip', 'session', 'beforeSend', 'configured'] as const;
+
 const addUnique = (items: string[], value: string): string[] => {
   const normalizedValue = value.trim();
   if (!normalizedValue || items.includes(normalizedValue)) {
@@ -52,6 +56,8 @@ const removeValue = (items: string[], value: string): string[] => (
 
 type ClaudePermissionsProps = {
   agent: 'claude';
+  defaultPermissionMode: ClaudeDefaultPermissionMode;
+  onDefaultPermissionModeChange: (value: ClaudeDefaultPermissionMode) => void;
   skipPermissions: boolean;
   onSkipPermissionsChange: (value: boolean) => void;
   allowedTools: string[];
@@ -61,6 +67,8 @@ type ClaudePermissionsProps = {
 };
 
 function ClaudePermissions({
+  defaultPermissionMode,
+  onDefaultPermissionModeChange,
   skipPermissions,
   onSkipPermissionsChange,
   allowedTools,
@@ -94,28 +102,89 @@ function ClaudePermissions({
 
   return (
     <div className="space-y-6">
+      {/* Local patch: spells out which settings are CloudCLI-only and which follow the terminal claude. */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+        <div className="mb-2 flex items-center gap-2 font-medium text-blue-900 dark:text-blue-100">
+          <Info className="h-4 w-4" />
+          {t('permissions.claude.intro.title')}
+        </div>
+        <ul className="list-disc space-y-1 pl-5 text-sm text-blue-800 dark:text-blue-200">
+          <li>{t('permissions.claude.intro.mode')}</li>
+          <li>{t('permissions.claude.intro.rules')}</li>
+          <li>{t('permissions.claude.intro.cloudcliLists')}</li>
+        </ul>
+      </div>
+
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <Shield className="h-5 w-5 text-green-500" />
+          <h3 className="text-lg font-medium text-foreground">{t('permissions.claude.defaultMode.title')}</h3>
+        </div>
+        <p className="text-sm text-muted-foreground">{t('permissions.claude.defaultMode.description')}</p>
+        <div className="space-y-2">
+          {CLAUDE_DEFAULT_PERMISSION_MODES.map((mode) => (
+            <label
+              key={mode}
+              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-3 transition-all ${defaultPermissionMode === mode
+                ? 'border-green-400 bg-green-50 dark:border-green-600 dark:bg-green-900/20'
+                : 'border-border bg-card/50 active:bg-accent/50'
+                }`}
+            >
+              <input
+                type="radio"
+                name="claudeDefaultPermissionMode"
+                checked={defaultPermissionMode === mode}
+                onChange={() => onDefaultPermissionModeChange(mode)}
+                className="mt-1 h-4 w-4 text-green-600"
+              />
+              <div>
+                <div className="font-medium text-foreground">{t(`permissions.claude.defaultMode.modes.${mode}.title`)}</div>
+                <div className="text-sm text-muted-foreground">
+                  {t(`permissions.claude.defaultMode.modes.${mode}.description`)}
+                </div>
+              </div>
+            </label>
+          ))}
+        </div>
+        <div className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+          <div className="mb-1 font-medium text-foreground">{t('permissions.claude.defaultMode.priority.title')}</div>
+          <ol className="list-decimal space-y-1 pl-5">
+            {CLAUDE_MODE_PRIORITY_STEPS.map((step) => (
+              <li key={step}>{t(`permissions.claude.defaultMode.priority.${step}`)}</li>
+            ))}
+          </ol>
+          <p className="mt-2 text-xs">{t('permissions.claude.defaultMode.priority.never')}</p>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <AlertTriangle className="h-5 w-5 text-orange-500" />
           <h3 className="text-lg font-medium text-foreground">{t('permissions.title')}</h3>
         </div>
         <div className="rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800 dark:bg-orange-900/20">
-          <label className="flex items-center gap-3">
-            <input
-              type="checkbox"
-              checked={skipPermissions}
-              onChange={(event) => onSkipPermissionsChange(event.target.checked)}
-              className="h-4 w-4 rounded border-input bg-card text-primary focus:ring-2 focus:ring-primary"
-            />
-            <div>
-              <div className="font-medium text-orange-900 dark:text-orange-100">
-                {t('permissions.skipPermissions.label')}
+          <Tooltip
+            content={t('permissions.claude.skipPermissions.tooltip')}
+            position="bottom"
+            className="max-w-xs whitespace-normal"
+          >
+            <label className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={skipPermissions}
+                onChange={(event) => onSkipPermissionsChange(event.target.checked)}
+                className="h-4 w-4 rounded border-input bg-card text-primary focus:ring-2 focus:ring-primary"
+              />
+              <div>
+                <div className="font-medium text-orange-900 dark:text-orange-100">
+                  {t('permissions.claude.skipPermissions.label')}
+                </div>
+                <div className="text-sm text-orange-700 dark:text-orange-300">
+                  {t('permissions.claude.skipPermissions.description')}
+                </div>
               </div>
-              <div className="text-sm text-orange-700 dark:text-orange-300">
-                {t('permissions.skipPermissions.claudeDescription')}
-              </div>
-            </div>
-          </label>
+            </label>
+          </Tooltip>
         </div>
       </div>
 
@@ -124,7 +193,7 @@ function ClaudePermissions({
           <Shield className="h-5 w-5 text-green-500" />
           <h3 className="text-lg font-medium text-foreground">{t('permissions.allowedTools.title')}</h3>
         </div>
-        <p className="text-sm text-muted-foreground">{t('permissions.allowedTools.description')}</p>
+        <p className="text-sm text-muted-foreground">{t('permissions.claude.allowedTools.description')}</p>
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input
@@ -186,7 +255,7 @@ function ClaudePermissions({
           ))}
           {allowedTools.length === 0 && (
             <div className="py-6 text-center text-muted-foreground">
-              {t('permissions.allowedTools.empty')}
+              {t('permissions.claude.allowedTools.empty')}
             </div>
           )}
         </div>
@@ -197,7 +266,7 @@ function ClaudePermissions({
           <AlertTriangle className="h-5 w-5 text-red-500" />
           <h3 className="text-lg font-medium text-foreground">{t('permissions.blockedTools.title')}</h3>
         </div>
-        <p className="text-sm text-muted-foreground">{t('permissions.blockedTools.description')}</p>
+        <p className="text-sm text-muted-foreground">{t('permissions.claude.blockedTools.description')}</p>
 
         <div className="flex flex-col gap-2 sm:flex-row">
           <Input
@@ -239,7 +308,7 @@ function ClaudePermissions({
           ))}
           {disallowedTools.length === 0 && (
             <div className="py-6 text-center text-muted-foreground">
-              {t('permissions.blockedTools.empty')}
+              {t('permissions.claude.blockedTools.empty')}
             </div>
           )}
         </div>

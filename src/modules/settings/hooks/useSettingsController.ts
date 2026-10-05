@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useTheme } from '@/shared/context/ThemeContext';
 import { api } from '@/shared/api';
-import { setNotificationSoundEnabled } from '@/shared/utils';
+import { setNotificationSoundEnabled, toClaudeDefaultPermissionMode } from '@/shared/utils';
 import {
   readCodeEditorSettings,
   writeCodeEditorSettings,
@@ -34,6 +34,7 @@ type ClaudeSettingsStorage = {
   allowedTools?: string[];
   disallowedTools?: string[];
   skipPermissions?: boolean;
+  defaultPermissionMode?: unknown;
   projectSortOrder?: ProjectSortOrder;
 };
 
@@ -79,6 +80,7 @@ const createEmptyClaudePermissions = (): ClaudePermissionsState => ({
   allowedTools: [],
   disallowedTools: [],
   skipPermissions: false,
+  defaultPermissionMode: 'default',
 });
 
 const createEmptyCursorPermissions = (): CursorPermissionsState => ({
@@ -156,6 +158,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
         allowedTools: savedClaudeSettings.allowedTools || [],
         disallowedTools: savedClaudeSettings.disallowedTools || [],
         skipPermissions: Boolean(savedClaudeSettings.skipPermissions),
+        defaultPermissionMode: toClaudeDefaultPermissionMode(savedClaudeSettings.defaultPermissionMode),
       });
       setProjectSortOrder(readUserPreference<ProjectSortOrder>('projectSortOrder', 'name') === 'date' ? 'date' : 'name');
 
@@ -227,6 +230,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
           allowedTools: claudePermissions.allowedTools,
           disallowedTools: claudePermissions.disallowedTools,
           skipPermissions: claudePermissions.skipPermissions,
+          defaultPermissionMode: claudePermissions.defaultPermissionMode,
         },
         projectSortOrder,
         cursorPermissions: {
@@ -253,6 +257,7 @@ export function useSettingsController({ isOpen, initialTab }: UseSettingsControl
     }
   }, [
     claudePermissions.allowedTools,
+    claudePermissions.defaultPermissionMode,
     claudePermissions.disallowedTools,
     claudePermissions.skipPermissions,
     codexPermissionMode,

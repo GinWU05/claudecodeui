@@ -514,6 +514,57 @@
     },
     "actions": {
       "add": "Add"
+    },
+    "claude": {
+      "intro": {
+        "title": "CloudCLI permissions are independent of the terminal claude",
+        "mode": "The permission mode (Default / Auto / Accept edits / Bypass) is set only here and in the composer; it never reads or writes defaultMode in ~/.claude/settings.json.",
+        "rules": "Tool rules follow the terminal claude: permissions.allow / deny in ~/.claude/settings.json apply here too — edit them there.",
+        "cloudcliLists": "The Allowed / Blocked Tools lists below apply to CloudCLI only, on top of the settings.json rules. Leave them empty by hand; \"Allow & remember\" in the chat adds entries automatically."
+      },
+      "defaultMode": {
+        "title": "Default permission mode",
+        "description": "Every new chat starts in this mode. Switching the mode in the composer only affects that chat and does not carry over to the next new chat.",
+        "modes": {
+          "default": {
+            "title": "Default (recommended)",
+            "description": "Every tool that is not pre-allowed asks for your approval."
+          },
+          "auto": {
+            "title": "Auto",
+            "description": "A classifier allows safe actions and blocks risky ones, with the fewest interruptions."
+          },
+          "acceptEdits": {
+            "title": "Accept edits",
+            "description": "File edits are approved automatically; commands and other actions still ask."
+          },
+          "plan": {
+            "title": "Plan",
+            "description": "Read-only planning, no changes are executed."
+          }
+        },
+        "priority": {
+          "title": "Permission mode priority (highest first):",
+          "skip": "When \"Skip permission prompts\" is on",
+          "session": "The mode picked in the composer for this chat",
+          "beforeSend": "The mode picked in the composer before a new chat's first message",
+          "configured": "The default permission mode on this page",
+          "never": "defaultMode in ~/.claude/settings.json is not read."
+        }
+      },
+      "skipPermissions": {
+        "label": "Skip permission prompts (dangerous)",
+        "description": "Equivalent to --dangerously-skip-permissions. While on, every tool runs without asking, whatever mode is chosen in the composer or above; only plan mode is the exception and stays read-only. Keep it off.",
+        "tooltip": "Keep this off. Principle: trust the terminal claude, not CloudCLI. When you really need to loosen things, switch the mode for the current chat in the composer instead of turning this on globally."
+      },
+      "allowedTools": {
+        "description": "Applies to CloudCLI only, stored in CloudCLI's own database; the terminal claude never sees it. Don't add entries here by hand — put long-lived rules in permissions.allow of ~/.claude/settings.json. Entries appear here when you click \"Allow & remember\" in the chat; remove any you no longer want.",
+        "empty": "No CloudCLI-only allow rules (allow rules in settings.json still apply)"
+      },
+      "blockedTools": {
+        "description": "Applies to CloudCLI only; the terminal claude never sees it. Prefer leaving it empty and using permissions.deny in ~/.claude/settings.json, which applies here as well.",
+        "empty": "No CloudCLI-only block rules (deny rules in settings.json still apply)"
+      }
     }
   },
   "mcpServers": {

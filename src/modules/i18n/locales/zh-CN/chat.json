@@ -277,5 +277,12 @@
     "failed": "未发送 — {{reason}}",
     "cancel": "取消定时消息",
     "dismiss": "关闭失败提示"
+  },
+  "permissionBanner": {
+    "deny": "拒绝",
+    "allowAndRemember": "允许并记住（仅 CloudCLI）",
+    "allowSaved": "允许（已记住）",
+    "allowAndRememberTooltip": "记进 CloudCLI 的允许列表，不会写进 settings.json",
+    "allowOnce": "仅本次允许"
   }
 }

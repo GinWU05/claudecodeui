@@ -366,5 +366,12 @@
     "tokensLabel_other": "tokens",
     "escClosesModal": "Esc closes the modal.",
     "close": "Close"
+  },
+  "permissionBanner": {
+    "deny": "Deny",
+    "allowAndRemember": "Allow & remember (CloudCLI only)",
+    "allowSaved": "Allow (saved)",
+    "allowAndRememberTooltip": "Adds the rule to CloudCLI's allow list; settings.json is not touched",
+    "allowOnce": "Allow once"
   }
 }

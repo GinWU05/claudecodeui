@@ -242,7 +242,10 @@ function mapCliOptionsToSDK(options = {}) {
     sdkOptions.cwd = cwd;
   }
 
-  if (permissionMode && permissionMode !== 'default') {
+  // Pass 'default' explicitly too (local patch): leaving it unset makes the SDK
+  // fall back to `permissions.defaultMode` in ~/.claude/settings.json, so a
+  // terminal-only bypass setting would silently apply to CloudCLI as well.
+  if (permissionMode) {
     sdkOptions.permissionMode = permissionMode;
   }
 
