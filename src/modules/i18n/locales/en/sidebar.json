@@ -142,7 +142,9 @@
     "matches_one": "{{count}} match",
     "matches_other": "{{count}} matches",
     "projectsScanned_one": "{{count}} project scanned",
-    "projectsScanned_other": "{{count}} projects scanned"
+    "projectsScanned_other": "{{count}} projects scanned",
+    "inboxTooltip": "Inbox",
+    "inboxPlaceholder": "Search inbox..."
   },
   "recent": {
     "title": "Recent conversations",
@@ -176,5 +178,18 @@
     "archiveSessions_other": "Archive {{count}} sessions",
     "archiveSessionsNotice_one": "Archive keeps the session out of the active list while preserving its history.",
     "archiveSessionsNotice_other": "Archive keeps the sessions out of the active list while preserving their history."
+  },
+  "inbox": {
+    "sectionNeedsYou": "Needs you",
+    "sectionUnseen": "Done · unseen",
+    "sectionWorking": "Working",
+    "statusWorking": "Working…",
+    "statusNeedsInput": "Waiting for your answer",
+    "statusError": "Stopped with an error",
+    "statusDone": "Finished",
+    "markAllSeen": "Mark all seen",
+    "emptyTitle": "All caught up",
+    "noMatchingSessions": "No inbox sessions match this search.",
+    "emptyDescription": "Sessions show up here while they run, and stay until you have looked at what they finished."
   }
 }

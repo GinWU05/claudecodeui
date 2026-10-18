@@ -52,6 +52,8 @@ const renderController = (initialProjects: Project[]) => renderHook(
     selectedProject: null,
     selectedSession: null,
     activeSessions: new Set<string>(),
+    backgroundSessionIds: new Set<string>(),
+    attentionSessionIds: new Map(),
     isLoading: false,
     isMobile: false,
     t,

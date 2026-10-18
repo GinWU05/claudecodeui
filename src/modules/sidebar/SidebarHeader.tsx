@@ -17,6 +17,7 @@ type SidebarHeaderProps = {
   isLoading: boolean;
   projectsCount: number;
   runningSessionsCount: number;
+  inboxUnseenCount: number;
   archivedSessionsCount: number;
   isArchivedSessionsLoading: boolean;
   searchFilter: string;
@@ -57,6 +58,7 @@ export default function SidebarHeader({
   isLoading,
   projectsCount,
   runningSessionsCount,
+  inboxUnseenCount,
   archivedSessionsCount,
   isArchivedSessionsLoading,
   searchFilter,
@@ -70,13 +72,13 @@ export default function SidebarHeader({
   onCollapseSidebar,
   t,
 }: SidebarHeaderProps) {
-  const showSearchTools = (projectsCount > 0 || runningSessionsCount > 0 || archivedSessionsCount > 0 || isArchivedSessionsLoading) && !isLoading;
+  const showSearchTools = (projectsCount > 0 || runningSessionsCount > 0 || inboxUnseenCount > 0 || archivedSessionsCount > 0 || isArchivedSessionsLoading) && !isLoading;
   const searchPlaceholder = searchMode === 'conversations'
     ? t('search.conversationsPlaceholder')
     : searchMode === 'archived'
       ? t('search.archivedPlaceholder', 'Search archived sessions...')
-      : searchMode === 'running'
-        ? t('search.runningPlaceholder', 'Search running sessions...')
+      : searchMode === 'inbox'
+        ? t('search.inboxPlaceholder', 'Search inbox...')
         : t('projects.searchPlaceholder');
 
   return (
@@ -145,6 +147,7 @@ export default function SidebarHeader({
               searchMode={searchMode}
               onSearchModeChange={onSearchModeChange}
               runningSessionsCount={runningSessionsCount}
+              inboxUnseenCount={inboxUnseenCount}
               t={t}
             />
             <div className="relative">
@@ -224,6 +227,7 @@ export default function SidebarHeader({
               searchMode={searchMode}
               onSearchModeChange={onSearchModeChange}
               runningSessionsCount={runningSessionsCount}
+              inboxUnseenCount={inboxUnseenCount}
               t={t}
             />
             <div className="relative">

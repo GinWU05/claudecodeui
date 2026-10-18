@@ -1518,8 +1518,8 @@ export type SessionRowActions = {
   activeSessions: ReadonlySet<string>;
   /** The subset of `activeSessions` that only has background tasks running, which show the purple dot instead of the spinner. */
   backgroundSessionIds: ReadonlySet<string>;
-  /** Sessions waiting on the user, which show the amber dot. */
-  attentionSessionIds: ReadonlySet<string>;
+  /** Sessions waiting on the user, which show the amber dot. Keyed by session id, so `.has()` reads it as a set. */
+  attentionSessionIds: SessionAttentionMap;
   onRenameDraftChange: (draft: string) => void;
   onStartEditingSession: (projectId: string, sessionId: string, initialName: string) => void;
   onCancelEditingSession: () => void;
@@ -1581,8 +1581,39 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 /** The ordering applied to the project list, either alphabetically by name or by most recent activity, persisted alongside the user's appearance settings. */
 export type ProjectSortOrder = 'name' | 'date';
 
-/** Which list the sidebar is currently showing: projects, conversation search results, running sessions or archived items. */
-export type SidebarSearchMode = 'projects' | 'conversations' | 'running' | 'archived';
+/** Which list the sidebar is currently showing: projects, conversation search results, the inbox of running and unseen sessions, or archived items. */
+export type SidebarSearchMode = 'projects' | 'conversations' | 'inbox' | 'archived';
+
+/**
+ * Why a session that is not on screen wants the user back: it is blocked on a
+ * permission or question, its turn finished, or its turn failed. Set only on
+ * those transitions, never on streamed output, so a running session is not
+ * "unread" on every token.
+ */
+export type SessionAttentionReason = 'needs-input' | 'done' | 'error';
+
+/** One pending attention mark: its reason and when it was raised (epoch ms), which orders the inbox. */
+export type SessionAttention = {
+  reason: SessionAttentionReason;
+  at: number;
+};
+
+/** Attention marks by session id. Opening a session clears its mark; nothing else needs the user to dismiss it. */
+export type SessionAttentionMap = ReadonlyMap<string, SessionAttention>;
+
+/**
+ * Inbox section a session is listed under, in display order: blocked on the
+ * user, finished or failed while the user was elsewhere, or still working.
+ */
+export type SidebarInboxSection = 'needs-you' | 'unseen' | 'working';
+
+/** A session as the sidebar inbox lists it, with its owning project and the attention mark that put it there, if any. */
+export type SidebarInboxItem = {
+  session: SessionWithProvider;
+  project: Project;
+  section: SidebarInboxSection;
+  attention: SessionAttention | null;
+};
 
 /** A Project narrowed to the archived state so archived entries can be listed and restored without being mistaken for active projects. */
 export type ArchivedProjectListItem = Project & { isArchived: true };

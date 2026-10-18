@@ -46,7 +46,7 @@ const makeActions = (overrides: Partial<SessionRowActions> = {}): SessionRowActi
   activeRename: null,
   activeSessions: new Set<string>(),
   backgroundSessionIds: new Set<string>(),
-  attentionSessionIds: new Set<string>(),
+  attentionSessionIds: new Map(),
   onRenameDraftChange: noop,
   onStartEditingSession: noop,
   onCancelEditingSession: noop,
@@ -151,7 +151,7 @@ test('a session with only background work running gets the purple dot, not the s
 test('a session needing attention gets the amber dot', () => {
   const { container } = renderList(
     [conversation('s1'), conversation('s2')],
-    makeActions({ attentionSessionIds: new Set(['s2']) }),
+    makeActions({ attentionSessionIds: new Map([['s2', { reason: 'done', at: 0 }]]) }),
   );
 
   const dots = container.querySelectorAll('[role="status"].bg-amber-500');

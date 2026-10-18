@@ -141,7 +141,9 @@
     "matches_one": "{{count}} 个匹配",
     "matches_other": "{{count}} 个匹配",
     "projectsScanned_one": "{{count}} 个项目已扫描",
-    "projectsScanned_other": "{{count}} 个项目已扫描"
+    "projectsScanned_other": "{{count}} 个项目已扫描",
+    "inboxTooltip": "收件箱",
+    "inboxPlaceholder": "搜索收件箱..."
   },
   "deleteConfirmation": {
     "deleteProject": "移除项目",
@@ -167,5 +169,18 @@
     "archiveSessions_other": "归档 {{count}} 个会话",
     "archiveSessionsNotice_one": "归档会将所选会话移出活动列表，但保留其历史记录。",
     "archiveSessionsNotice_other": "归档会将所选会话移出活动列表，但保留其历史记录。"
+  },
+  "inbox": {
+    "sectionNeedsYou": "等你处理",
+    "sectionUnseen": "已完成 · 未查看",
+    "sectionWorking": "运行中",
+    "statusWorking": "运行中…",
+    "statusNeedsInput": "等待你的回应",
+    "statusError": "出错停止",
+    "statusDone": "已完成",
+    "markAllSeen": "全部标为已读",
+    "emptyTitle": "都看完了",
+    "noMatchingSessions": "没有匹配的收件箱会话。",
+    "emptyDescription": "会话运行时会出现在这里，跑完后一直保留，直到你打开看过。"
   }
 }

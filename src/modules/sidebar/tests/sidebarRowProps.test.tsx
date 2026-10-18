@@ -4,7 +4,7 @@ import { render } from '@testing-library/react';
 import React from 'react';
 import { beforeEach, test, vi } from 'vitest';
 
-import type { ActiveSidebarRename, Project, SidebarProjectListProps, SidebarSessionSelection } from '@/shared/types';
+import type { ActiveSidebarRename, Project, SessionAttentionMap, SidebarProjectListProps, SidebarSessionSelection } from '@/shared/types';
 
 /**
  * SidebarProjectItem and SidebarSessionItem are memoized because a websocket
@@ -59,6 +59,7 @@ const NOW = new Date('2026-08-21T10:00:00.000Z');
 // membership changes, and attentionSessionIds is passed into Sidebar from above.
 // Rebuilding them per render here would test the harness, not the component.
 const NO_SESSION_IDS: ReadonlySet<string> = new Set<string>();
+const NO_ATTENTION: SessionAttentionMap = new Map();
 
 const listProps = (
   activeRename: ActiveSidebarRename | null,
@@ -82,7 +83,7 @@ const listProps = (
   loadingMoreProjects: new Set(),
   activeSessions: NO_SESSION_IDS,
   backgroundSessionIds: NO_SESSION_IDS,
-  attentionSessionIds: NO_SESSION_IDS,
+  attentionSessionIds: NO_ATTENTION,
   isProjectStarred: () => false,
   onRenameDraftChange: noop,
   onToggleProject: noop,
@@ -237,7 +238,7 @@ const sessionsProps = (
   isLoadingMoreSessions: false,
   activeSessions: NO_SESSION_IDS,
   backgroundSessionIds: NO_SESSION_IDS,
-  attentionSessionIds: NO_SESSION_IDS,
+  attentionSessionIds: NO_ATTENTION,
   currentTime: NOW,
   sessionRenameId,
   sessionRenameDraft,

@@ -4,7 +4,7 @@ import type { TFunction } from 'i18next';
 import { api } from '@/shared/api';
 import { subscribeToUserPreferences } from '@/shared/userSettings';
 import { usePaletteOps } from '@/modules/command-palette';
-import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationProjectResult, ConversationSearchResults, LLMProvider, Project, ProjectSession, ProjectSortOrder, RecentConversationListItem, SearchProgress, ActiveSidebarRename, PendingSidebarDeletion, SessionTitleSearchResult, SessionWithProvider, SidebarSearchMode, SidebarSessionSelection } from '@/shared/types';
+import type { ArchivedProjectListItem, ArchivedSessionListItem, ConversationProjectResult, ConversationSearchResults, LLMProvider, Project, ProjectSession, ProjectSortOrder, RecentConversationListItem, SearchProgress, ActiveSidebarRename, PendingSidebarDeletion, SessionAttentionMap, SessionTitleSearchResult, SessionWithProvider, SidebarInboxItem, SidebarInboxSection, SidebarSearchMode, SidebarSessionSelection } from '@/shared/types';
 import {
   filterProjects,
   getAllSessions,
@@ -40,6 +40,18 @@ type RecentConversationsApiPayload = {
   };
 };
 
+const INBOX_SECTION_ORDER: readonly SidebarInboxSection[] = ['needs-you', 'unseen', 'working'];
+
+// Newest first within a section: a marked session by when it was marked, a
+// working one by its last transcript activity.
+const getInboxItemTime = (item: SidebarInboxItem): number => {
+  if (item.attention) {
+    return item.attention.at;
+  }
+  const lastActivity = Date.parse(String(item.session.lastActivity ?? ''));
+  return Number.isNaN(lastActivity) ? 0 : lastActivity;
+};
+
 type UseSidebarControllerArgs = {
   projects: Project[];
   selectedProject: Project | null;
@@ -47,6 +59,8 @@ type UseSidebarControllerArgs = {
   activeSessions: ReadonlySet<string>;
   /** The busy sessions only running background work; unlike the rest of `activeSessions` they can be deleted. */
   backgroundSessionIds: ReadonlySet<string>;
+  /** Sessions that finished, failed or got blocked while off screen; with `activeSessions` they make up the inbox. */
+  attentionSessionIds: SessionAttentionMap;
   isLoading: boolean;
   isMobile: boolean;
   t: TFunction;
@@ -68,6 +82,7 @@ export function useSidebarController({
   selectedSession: _selectedSession,
   activeSessions,
   backgroundSessionIds,
+  attentionSessionIds,
   isLoading,
   isMobile,
   t,
@@ -83,8 +98,6 @@ export function useSidebarController({
 }: UseSidebarControllerArgs) {
   const paletteOps = usePaletteOps();
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
-  // Running groups start expanded and remember manual collapses independently of Projects.
-  const [collapsedRunningProjects, setCollapsedRunningProjects] = useState<Set<string>>(new Set());
   // The one rename the sidebar has open, as a single value so a project and a
   // session cannot both be mid-rename. See ActiveSidebarRename.
   const [activeRename, setActiveRename] = useState<ActiveSidebarRename | null>(null);
@@ -133,8 +146,6 @@ export function useSidebarController({
   const onRefreshRef = useRef(onRefresh);
 
   const isSidebarCollapsed = !isMobile && !sidebarVisible;
-  const activeSessionIds = activeSessions;
-  const runningSessionsCount = activeSessionIds.size;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -545,17 +556,6 @@ export function useSidebarController({
       // selection they belong to is dropped with them.
       setSessionSelection(null);
 
-      if (searchMode === 'running') {
-        setCollapsedRunningProjects((prev) => {
-          const next = new Set(prev);
-          if (!next.delete(projectId)) {
-            next.add(projectId);
-          }
-          return next;
-        });
-        return;
-      }
-
       setExpandedProjects((prev) => {
         const next = new Set<string>();
         if (!prev.has(projectId)) {
@@ -564,15 +564,12 @@ export function useSidebarController({
         return next;
       });
     },
-    [searchMode],
+    [],
   );
 
   const isProjectExpanded = useCallback(
-    (projectId: string) =>
-      searchMode === 'running'
-        ? !collapsedRunningProjects.has(projectId)
-        : expandedProjects.has(projectId),
-    [collapsedRunningProjects, expandedProjects, searchMode],
+    (projectId: string) => expandedProjects.has(projectId),
+    [expandedProjects],
   );
 
   const handleSessionClick = useCallback(
@@ -722,35 +719,63 @@ export function useSidebarController({
     [projectSortOrder, projectsWithResolvedStarState],
   );
 
-  const runningProjects = useMemo(() => {
-    if (activeSessionIds.size === 0) {
+  // Every session that is running or waiting to be looked at, across all
+  // projects, in the order the inbox lists them. Built from the loaded session
+  // pages: a session with fresh activity is always on its project's first one.
+  const inboxItems = useMemo(() => {
+    if (activeSessions.size === 0 && attentionSessionIds.size === 0) {
       return [];
     }
 
-    return sortedProjects.reduce<Project[]>((acc, project) => {
-      const sessions = (project.sessions ?? []).filter((session) => activeSessionIds.has(String(session.id)));
-      const runningCount = sessions.length;
+    const items: SidebarInboxItem[] = [];
+    for (const project of sortedProjects) {
+      for (const session of getAllSessions(project)) {
+        const attention = attentionSessionIds.get(session.id) ?? null;
+        const isBusy = activeSessions.has(session.id);
+        if (!attention && !isBusy) {
+          continue;
+        }
 
-      if (runningCount === 0) {
-        return acc;
+        // Blocked beats working beats finished: a session asking for a
+        // permission is also busy, and one that started again is no longer
+        // just "done".
+        const section: SidebarInboxSection = attention?.reason === 'needs-input'
+          ? 'needs-you'
+          : isBusy
+            ? 'working'
+            : 'unseen';
+        items.push({ session, project, section, attention });
       }
+    }
 
-      acc.push({
-        ...project,
-        sessions,
-        sessionMeta: {
-          ...project.sessionMeta,
-          total: runningCount,
-          hasMore: false,
-        },
-      });
-      return acc;
-    }, []);
-  }, [activeSessionIds, sortedProjects]);
+    return items.sort((a, b) => (
+      INBOX_SECTION_ORDER.indexOf(a.section) - INBOX_SECTION_ORDER.indexOf(b.section)
+      || getInboxItemTime(b) - getInboxItemTime(a)
+    ));
+  }, [activeSessions, attentionSessionIds, sortedProjects]);
+
+  // What the tab badge counts: rows the user has to act on or has not seen.
+  // Working rows are only status, so they are left out.
+  const inboxUnseenCount = useMemo(
+    () => inboxItems.filter((item) => item.section !== 'working').length,
+    [inboxItems],
+  );
+
+  const filteredInboxItems = useMemo(() => {
+    const normalizedSearch = debouncedSearchQuery.trim().toLowerCase();
+    if (!normalizedSearch) {
+      return inboxItems;
+    }
+
+    return inboxItems.filter(({ session, project }) => (
+      [session.summary, session.name, project.displayName, project.path ?? project.fullPath]
+        .some((field) => typeof field === 'string' && field.toLowerCase().includes(normalizedSearch))
+    ));
+  }, [debouncedSearchQuery, inboxItems]);
 
   const filteredProjects = useMemo(
-    () => filterProjects(searchMode === 'running' ? runningProjects : sortedProjects, debouncedSearchQuery),
-    [debouncedSearchQuery, runningProjects, searchMode, sortedProjects],
+    () => filterProjects(sortedProjects, debouncedSearchQuery),
+    [debouncedSearchQuery, sortedProjects],
   );
 
   const filteredArchivedSessions = useMemo(() => {
@@ -1257,7 +1282,9 @@ export function useSidebarController({
     pendingDeletion,
     showVersionModal,
     filteredProjects,
-    runningSessionsCount,
+    inboxItems: filteredInboxItems,
+    inboxTotalCount: inboxItems.length,
+    inboxUnseenCount,
     archivedProjects: filteredArchivedProjects,
     archivedSessions: filteredArchivedSessions,
     archivedSessionsCount: archivedProjects.length + archivedSessions.length,

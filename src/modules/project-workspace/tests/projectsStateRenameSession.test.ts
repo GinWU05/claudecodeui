@@ -50,6 +50,7 @@ const renderProjectsState = async () => {
       subscribe: () => () => {},
       isMobile: false,
       isSessionProcessing: () => false,
+      busySessionIds: new Set<string>(),
     }),
   );
 };

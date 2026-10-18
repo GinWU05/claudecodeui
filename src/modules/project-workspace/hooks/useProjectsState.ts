@@ -7,7 +7,10 @@ import type { ServerEvent,
   LLMProvider,
   LoadingProgress,
   Project,
-  ProjectSession,IsSessionProcessing } from '@/shared/types';
+  ProjectSession,IsSessionProcessing,
+  SessionAttention,
+  SessionAttentionMap,
+  SessionAttentionReason } from '@/shared/types';
 import { mergeProjectSelectionMetadata } from '@/modules/project-workspace/utils/projectSelectionMetadata';
 import { readSelectedProvider } from '@/shared/selectedProvider';
 
@@ -18,6 +21,8 @@ type UseProjectsStateArgs = {
   subscribe: (listener: (event: ServerEvent) => void) => () => void;
   isMobile: boolean;
   isSessionProcessing: IsSessionProcessing;
+  /** Sessions with a run or background work in flight; one leaving the set has finished its turn. */
+  busySessionIds: ReadonlySet<string>;
 };
 
 /**
@@ -251,6 +256,23 @@ const getSessionAliasIds = (event: SessionUpsertedEvent): Set<string> => {
  * watcher); new rows are prepended since the watcher only fires for sessions
  * with fresh activity. `sessionMeta.total` grows only on insert.
  */
+/** Whether an upsert moves the session's lastActivity past the copy already in the list; a session not listed yet counts as new. */
+const hasNewerActivity = (projects: Project[], event: SessionUpsertedEvent): boolean => {
+  const incoming = Date.parse(String(event.session.lastActivity ?? ''));
+  if (Number.isNaN(incoming)) {
+    return false;
+  }
+
+  for (const project of projects) {
+    const existing = project.sessions?.find((session) => session.id === event.sessionId);
+    if (existing) {
+      const previous = Date.parse(String(existing.lastActivity ?? ''));
+      return Number.isNaN(previous) || incoming > previous;
+    }
+  }
+  return true;
+};
+
 const upsertSessionIntoProject = (project: Project, event: SessionUpsertedEvent): Project => {
   const sessions = project.sessions ?? [];
   const aliasIds = getSessionAliasIds(event);
@@ -379,17 +401,69 @@ const readPersistedTab = (): AppTab => {
   return 'chat';
 };
 
+const SESSION_ATTENTION_STORAGE_KEY = 'sessionAttention';
+// A mark nobody came back for in a week is no longer news; dropping it keeps
+// the stored map from growing with every session ever finished.
+const SESSION_ATTENTION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const SESSION_ATTENTION_REASONS: readonly SessionAttentionReason[] = ['needs-input', 'done', 'error'];
+
+const readPersistedSessionAttention = (): Map<string, SessionAttention> => {
+  const marks = new Map<string, SessionAttention>();
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(SESSION_ATTENTION_STORAGE_KEY) ?? '{}');
+    if (!parsed || typeof parsed !== 'object') {
+      return marks;
+    }
+    const oldestKept = Date.now() - SESSION_ATTENTION_MAX_AGE_MS;
+    for (const [sessionId, value] of Object.entries(parsed as Record<string, unknown>)) {
+      const mark = value as Partial<SessionAttention> | null;
+      if (
+        mark
+        && typeof mark.at === 'number'
+        && mark.at >= oldestKept
+        && SESSION_ATTENTION_REASONS.includes(mark.reason as SessionAttentionReason)
+      ) {
+        marks.set(sessionId, { reason: mark.reason as SessionAttentionReason, at: mark.at });
+      }
+    }
+  } catch {
+    // Unreadable or unavailable storage starts the inbox empty.
+  }
+  return marks;
+};
+
+/**
+ * Which attention mark a transcript event raises for a session that is not on
+ * screen, if any. Only turn-level transitions count: streamed text and tool
+ * calls of a running session are progress, not something to come back for.
+ */
+const getAttentionReasonForEvent = (kind: unknown): SessionAttentionReason | null => {
+  switch (kind) {
+    case 'permission_request':
+      return 'needs-input';
+    case 'complete':
+      return 'done';
+    case 'error':
+      return 'error';
+    default:
+      return null;
+  }
+};
+
 export function useProjectsState({
   sessionId,
   navigate,
   subscribe,
   isMobile,
   isSessionProcessing,
+  busySessionIds,
 }: UseProjectsStateArgs) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedSession, setSelectedSession] = useState<ProjectSession | null>(null);
-  const [attentionSessionIds, setAttentionSessionIds] = useState<Set<string>>(new Set());
+  // Sessions that finished, failed or got blocked while the user was looking
+  // elsewhere. Persisted so a reload does not forget what is still unseen.
+  const [attentionSessionIds, setAttentionSessionIds] = useState<SessionAttentionMap>(readPersistedSessionAttention);
   const [activeTab, setActiveTab] = useState<AppTab>(readPersistedTab);
 
   useEffect(() => {
@@ -471,7 +545,7 @@ export function useProjectsState({
     sessionLookupRef.current = null;
   }, [sessionId]);
 
-  const markSessionAttention = useCallback((targetSessionId?: string | null) => {
+  const markSessionAttention = useCallback((targetSessionId: string | null | undefined, reason: SessionAttentionReason) => {
     if (!targetSessionId) {
       return;
     }
@@ -482,12 +556,15 @@ export function useProjectsState({
     }
 
     setAttentionSessionIds((previous) => {
-      if (previous.has(targetSessionId)) {
+      const existing = previous.get(targetSessionId);
+      // A failure is not downgraded to "done" by the idle transition that
+      // follows it; anything else takes the newer reason and time.
+      if (existing?.reason === 'error' && reason === 'done') {
         return previous;
       }
 
-      const next = new Set(previous);
-      next.add(targetSessionId);
+      const next = new Map(previous);
+      next.set(targetSessionId, { reason, at: Date.now() });
       return next;
     });
   }, [sessionId]);
@@ -502,11 +579,44 @@ export function useProjectsState({
         return previous;
       }
 
-      const next = new Set(previous);
+      const next = new Map(previous);
       next.delete(targetSessionId);
       return next;
     });
   }, []);
+
+  /** Clears the finished and failed marks in one go; a session still blocked on the user keeps its mark. */
+  const clearSeenSessionAttention = useCallback(() => {
+    setAttentionSessionIds((previous) => {
+      const next = new Map([...previous].filter(([, mark]) => mark.reason === 'needs-input'));
+      return next.size === previous.size ? previous : next;
+    });
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        SESSION_ATTENTION_STORAGE_KEY,
+        JSON.stringify(Object.fromEntries(attentionSessionIds)),
+      );
+    } catch {
+      // Silently ignore storage errors
+    }
+  }, [attentionSessionIds]);
+
+  // A session leaving the busy set finished its turn. This is the one signal
+  // every provider produces — runs started from the CLI or another client
+  // included, which never send this client a `complete` event.
+  const previousBusySessionIdsRef = useRef<ReadonlySet<string>>(busySessionIds);
+  useEffect(() => {
+    const previousBusySessionIds = previousBusySessionIdsRef.current;
+    previousBusySessionIdsRef.current = busySessionIds;
+    for (const busySessionId of previousBusySessionIds) {
+      if (!busySessionIds.has(busySessionId)) {
+        markSessionAttention(busySessionId, 'done');
+      }
+    }
+  }, [busySessionIds, markSessionAttention]);
 
   const fetchProjects = useCallback(async ({ showLoadingState = true }: FetchProjectsOptions = {}) => {
     // Claimed before the request starts and read again in `finally`, so the
@@ -755,19 +865,25 @@ export function useProjectsState({
         : null;
       const viewedSessionId = selectedSessionRef.current?.id ?? sessionId ?? null;
 
+      const attentionReason = getAttentionReasonForEvent(event.kind);
+      if (eventSessionId && eventSessionId !== viewedSessionId && attentionReason) {
+        markSessionAttention(eventSessionId, attentionReason);
+      }
+
+      // Answered from another client: the session is working again, and its
+      // next transition raises a new mark.
       if (
         eventSessionId
-        && eventSessionId !== viewedSessionId
-        && event.kind !== 'chat_subscribed'
-        && event.kind !== 'loading_progress'
-        && event.kind !== 'session_upserted'
-        && event.kind !== 'status'
-        && event.kind !== 'stream_end'
-        && event.kind !== 'permission_resolved'
-        && event.kind !== 'permission_cancelled'
-        && event.kind !== 'websocket_reconnected'
+        && (event.kind === 'permission_resolved' || event.kind === 'permission_cancelled')
       ) {
-        markSessionAttention(eventSessionId);
+        setAttentionSessionIds((previous) => {
+          if (previous.get(eventSessionId)?.reason !== 'needs-input') {
+            return previous;
+          }
+          const next = new Map(previous);
+          next.delete(eventSessionId);
+          return next;
+        });
       }
 
       if (event.kind !== 'session_upserted') {
@@ -789,8 +905,14 @@ export function useProjectsState({
         && !isSessionProcessing(upsert.sessionId)
       ) {
         setExternalMessageUpdate((prev) => prev + 1);
-      } else {
-        markSessionAttention(upsert.sessionId);
+      } else if (
+        !isSessionProcessing(upsert.sessionId)
+        && hasNewerActivity(projectsRef.current, upsert)
+      ) {
+        // The transcript grew outside any run this client tracks, e.g. a CLI
+        // turn that ended between two running-session polls. A rename or a
+        // metadata refresh does not move lastActivity and raises nothing.
+        markSessionAttention(upsert.sessionId, 'done');
       }
 
       setProjects((previousProjects) => {
@@ -1254,6 +1376,7 @@ export function useProjectsState({
       selectedProject,
       selectedSession,
       attentionSessionIds,
+      onClearSeenSessionAttention: clearSeenSessionAttention,
       onProjectSelect: handleProjectSelect,
       onSessionSelect: handleSessionSelect,
       onNewSession: handleNewSession,
@@ -1271,6 +1394,7 @@ export function useProjectsState({
     }),
     [
       attentionSessionIds,
+      clearSeenSessionAttention,
       handleNewSession,
       handleProjectDelete,
       handleProjectSelect,

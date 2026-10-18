@@ -69,6 +69,7 @@ const renderProjectsState = async () => {
       },
       isMobile: false,
       isSessionProcessing: () => false,
+      busySessionIds: new Set<string>(),
     }),
   );
 };
@@ -239,6 +240,7 @@ test('a superseded first load never renders the sidebar as empty', async () => {
       },
       isMobile: false,
       isSessionProcessing: () => false,
+      busySessionIds: new Set<string>(),
     });
     renderedStates.push({
       isLoading: state.isLoadingProjects,

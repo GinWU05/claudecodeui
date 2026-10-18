@@ -89,6 +89,7 @@ const renderProjectsState = async (navigate: ReturnType<typeof vi.fn>, urlSessio
       },
       isMobile: false,
       isSessionProcessing: () => false,
+      busySessionIds: new Set<string>(),
     }),
   );
 };

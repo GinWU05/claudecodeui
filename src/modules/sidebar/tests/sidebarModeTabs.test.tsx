@@ -17,7 +17,7 @@ import SidebarModeTabs from '@/modules/sidebar/SidebarModeTabs';
 const LABELS: Record<string, string> = {
   'search.modeProjects': 'Projects',
   'search.modeConversations': 'Conversations',
-  'search.runningTooltip': 'Running sessions',
+  'search.inboxTooltip': 'Inbox',
   'search.archiveOnlyTooltip': 'Archive only',
   'search.modeMore': 'More',
 };
@@ -42,6 +42,7 @@ const renderTabs = (rowWidth: number, searchMode: SidebarSearchMode) => {
       searchMode={searchMode}
       onSearchModeChange={(mode) => changes.push(mode)}
       runningSessionsCount={0}
+      inboxUnseenCount={0}
       t={t}
     />,
   );
@@ -53,7 +54,7 @@ test('a wide row shows every tab and no overflow menu', () => {
 
   assert.ok(screen.getByRole('button', { name: 'Projects' }));
   assert.ok(screen.getByRole('button', { name: 'Conversations' }));
-  assert.ok(screen.getByRole('button', { name: 'Running sessions' }));
+  assert.ok(screen.getByRole('button', { name: 'Inbox' }));
   assert.ok(screen.getByRole('button', { name: 'Archive only' }));
   assert.equal(screen.queryByRole('button', { name: 'More' }), null);
 });
@@ -65,7 +66,7 @@ test('a narrow row moves the tabs that no longer fit into the dropdown', () => {
   assert.equal(screen.queryByRole('button', { name: 'Conversations' }), null);
 
   fireEvent.click(screen.getByRole('button', { name: 'More' }));
-  assert.ok(screen.getByRole('menuitem', { name: 'Running sessions' }));
+  assert.ok(screen.getByRole('menuitem', { name: 'Inbox' }));
   assert.ok(screen.getByRole('menuitem', { name: 'Archive only' }));
 
   fireEvent.click(screen.getByRole('menuitem', { name: 'Conversations' }));

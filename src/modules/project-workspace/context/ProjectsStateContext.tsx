@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import type { NavigateFunction } from 'react-router-dom';
 
 import { useProjectsState } from '@/modules/project-workspace/hooks/useProjectsState';
+import { useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
 import type { IsSessionProcessing,ServerEvent } from '@/shared/types';
 
 type ProjectsState = ReturnType<typeof useProjectsState>;
@@ -67,12 +68,16 @@ export function ProjectsStateProvider({
   isMobile,
   isSessionProcessing,
 }: ProjectsStateProviderProps) {
+  // Read here rather than in the route: a change re-renders only this
+  // provider, not the workspace shell it is handed as children.
+  const busySessionIds = useBusySessionIdSet();
   const state = useProjectsState({
     sessionId,
     navigate,
     subscribe,
     isMobile,
     isSessionProcessing,
+    busySessionIds,
   });
 
   const sidebarState = useMemo<ProjectSidebarState>(

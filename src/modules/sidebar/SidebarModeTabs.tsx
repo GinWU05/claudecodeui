@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { Activity, Archive, Folder, MessageSquare, MoreHorizontal } from 'lucide-react';
+import { Archive, Folder, Inbox, MessageSquare, MoreHorizontal } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { TFunction } from 'i18next';
 
@@ -19,7 +19,10 @@ type ModeTab = {
 type SidebarModeTabsProps = {
   searchMode: SidebarSearchMode;
   onSearchModeChange: (mode: SidebarSearchMode) => void;
+  /** Turns the inbox icon green while anything is running. */
   runningSessionsCount: number;
+  /** The inbox badge: sessions blocked on the user or finished and not yet looked at. */
+  inboxUnseenCount: number;
   t: TFunction;
 };
 
@@ -35,19 +38,20 @@ export default function SidebarModeTabs({
   searchMode,
   onSearchModeChange,
   runningSessionsCount,
+  inboxUnseenCount,
   t,
 }: SidebarModeTabsProps) {
   const tabs: ModeTab[] = [
     { mode: 'projects', label: t('search.modeProjects'), icon: Folder, showLabel: true },
     { mode: 'conversations', label: t('search.modeConversations'), icon: MessageSquare, showLabel: true },
-    { mode: 'running', label: t('search.runningTooltip', 'Running sessions'), icon: Activity, showLabel: false },
+    { mode: 'inbox', label: t('search.inboxTooltip', 'Inbox'), icon: Inbox, showLabel: false },
     { mode: 'archived', label: t('search.archiveOnlyTooltip', 'Archive only'), icon: Archive, showLabel: false },
   ];
 
   const activeIndex = tabs.findIndex((tab) => tab.mode === searchMode);
   const { rowRef, mirrorRef, visibleIndexes } = useTabOverflow(tabs.length, activeIndex);
   const hiddenTabs = tabs.filter((_, index) => !visibleIndexes.includes(index));
-  const runningBadgeText = runningSessionsCount > 99 ? '99+' : String(runningSessionsCount);
+  const inboxBadgeText = inboxUnseenCount > 99 ? '99+' : String(inboxUnseenCount);
   const moreLabel = t('search.modeMore', 'More');
 
   const renderTab = (tab: ModeTab, canGrow: boolean) => {
@@ -67,15 +71,17 @@ export default function SidebarModeTabs({
           isActive
             ? 'bg-background text-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground',
-          isActive && tab.mode === 'running' && 'ring-1 ring-emerald-500/15',
         )}
       >
-        {tab.mode === 'running' ? (
+        {tab.mode === 'inbox' ? (
           <span className="relative flex h-3 w-3 items-center justify-center">
-            <Activity className={cn('h-3 w-3', runningSessionsCount > 0 && 'text-emerald-500')} />
-            {runningSessionsCount > 0 && (
-              <span className="absolute -right-2.5 -top-2 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-emerald-500 px-0.5 text-[8px] font-semibold leading-none text-white shadow-sm ring-1 ring-background">
-                {runningBadgeText}
+            <Inbox className={cn('h-3 w-3', runningSessionsCount > 0 && 'text-emerald-500')} />
+            {inboxUnseenCount > 0 && (
+              <span
+                data-testid="sidebar-inbox-badge"
+                className="absolute -right-2.5 -top-2 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-amber-500 px-0.5 text-[8px] font-semibold leading-none text-white shadow-sm ring-1 ring-background"
+              >
+                {inboxBadgeText}
               </span>
             )}
           </span>

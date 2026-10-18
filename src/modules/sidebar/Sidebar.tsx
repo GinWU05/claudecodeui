@@ -8,7 +8,7 @@ import { useSidebarController } from '@/modules/sidebar/hooks/useSidebarControll
 import { useTaskMaster, useTasksSettings } from '@/modules/task-master';
 import { usePaletteOps } from '@/modules/command-palette';
 import { useBackgroundSessionIdSet, useBusySessionIdSet } from '@/shared/context/SessionProtectionContext';
-import type { LLMProvider, LoadingProgress, MCPServerStatus, Project, ProjectSession, SidebarProjectListProps } from '@/shared/types';
+import type { LLMProvider, LoadingProgress, MCPServerStatus, Project, ProjectSession, SessionAttentionMap, SidebarProjectListProps } from '@/shared/types';
 import SidebarCollapsed from '@/modules/sidebar/SidebarCollapsed';
 import SidebarContent from '@/modules/sidebar/SidebarContent';
 import SidebarModals from '@/modules/sidebar/SidebarModals';
@@ -17,7 +17,9 @@ type SidebarProps = {
   projects: Project[];
   selectedProject: Project | null;
   selectedSession: ProjectSession | null;
-  attentionSessionIds: ReadonlySet<string>;
+  attentionSessionIds: SessionAttentionMap;
+  /** Clears every finished or failed attention mark; the inbox's "Mark all seen". */
+  onClearSeenSessionAttention: () => void;
   onProjectSelect: (project: Project) => void;
   onSessionSelect: (session: ProjectSession) => void;
   onNewSession: (project: Project) => void;
@@ -47,6 +49,7 @@ function Sidebar({
   selectedProject,
   selectedSession,
   attentionSessionIds,
+  onClearSeenSessionAttention,
   onProjectSelect,
   onSessionSelect,
   onNewSession,
@@ -94,7 +97,9 @@ function Sidebar({
     isSearching,
     searchProgress,
     clearConversationResults,
-    runningSessionsCount,
+    inboxItems,
+    inboxTotalCount,
+    inboxUnseenCount,
     deletingProjects,
     pendingDeletion,
     showVersionModal,
@@ -152,6 +157,7 @@ function Sidebar({
     selectedSession,
     activeSessions,
     backgroundSessionIds,
+    attentionSessionIds,
     isLoading,
     isMobile,
     t,
@@ -276,7 +282,11 @@ function Sidebar({
             isMobile={isMobile}
             isLoading={isLoading}
             projects={projects}
-            runningSessionsCount={runningSessionsCount}
+            runningSessionsCount={activeSessions.size}
+            inboxItems={inboxItems}
+            inboxTotalCount={inboxTotalCount}
+            inboxUnseenCount={inboxUnseenCount}
+            onClearSeenSessionAttention={onClearSeenSessionAttention}
             archivedProjects={archivedProjects}
             archivedSessions={archivedSessions}
             archivedSessionsCount={archivedSessionsCount}
