@@ -21,7 +21,7 @@ function createDependencies(
   };
 }
 
-test('git installations update from the application root', async () => {
+test('git installations merge upstream from the application root', async () => {
   const calls: unknown[][] = [];
   const dependencies = createDependencies({
     runShellCommand: async (command, workingDirectory, environment) => {
@@ -34,7 +34,8 @@ test('git installations update from the application root', async () => {
   const result = await service.updateSystem();
 
   assert.deepEqual(calls, [[
-    'git checkout main && git pull && npm install',
+    'git fetch upstream && git checkout main && '
+      + '{ git merge --no-edit upstream/main || { git merge --abort; exit 1; }; } && npm install',
     '/app/cloudcli',
     dependencies.environment,
   ]]);

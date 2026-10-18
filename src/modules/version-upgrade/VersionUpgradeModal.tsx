@@ -32,7 +32,8 @@ export function VersionUpgradeModal({
         ? t('versionUpdate.npmUpgradeCommand')
         : IS_PLATFORM
             ? 'npm run update:platform'
-            : 'git checkout main && git pull && npm install';
+            // Local fork patch: track upstream releases rather than pulling the fork.
+            : 'git fetch upstream && git checkout main && git merge upstream/main && npm install';
     const [isUpdating, setIsUpdating] = useState(false);
     const [updateOutput, setUpdateOutput] = useState('');
     const [updateError, setUpdateError] = useState('');

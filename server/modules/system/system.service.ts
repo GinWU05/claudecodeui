@@ -4,6 +4,13 @@ type SystemUpdateCommandResult = {
   errorOutput: string;
 };
 
+// Local fork patch: `origin` is the personal fork, so git installs merge the
+// upstream release line instead of pulling the fork. A conflicting merge is
+// aborted so the working tree is never left half-merged.
+const GIT_UPDATE_COMMAND =
+  'git fetch upstream && git checkout main && '
+  + '{ git merge --no-edit upstream/main || { git merge --abort; exit 1; }; } && npm install';
+
 type SystemUpdateDependencies = {
   appRoot: string;
   homeDirectory: string;
@@ -32,7 +39,7 @@ export function createSystemUpdateService(dependencies: SystemUpdateDependencies
       const updateCommand = dependencies.isPlatform
         ? 'npm run update:platform'
         : dependencies.installMode === 'git'
-          ? 'git checkout main && git pull && npm install'
+          ? GIT_UPDATE_COMMAND
           : 'npm install -g @cloudcli-ai/cloudcli@latest';
       const workingDirectory = dependencies.isPlatform || dependencies.installMode === 'git'
         ? dependencies.appRoot
